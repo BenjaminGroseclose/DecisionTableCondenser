@@ -1,0 +1,221 @@
+﻿@page "/"
+
+<MudPaper Class="pa-4">
+    <MudStack Row="true" Spacing="2">
+        <MudTextField Label="Condition Rows" @bind-Value="ConditionRows" Variant="Variant.Outlined"></MudTextField>
+        <MudTextField Label="Action Rows" @bind-Value="ActionRows" Variant="Variant.Outlined"></MudTextField>
+
+        <MudTextField Label="Columns" @bind-Value="Columns" Variant="Variant.Outlined"></MudTextField>
+
+    </MudStack>
+    <MudButton Class="mt-2" Variant="Variant.Outlined" OnClick="CreateGrid">Create / Reset Grid</MudButton>
+</MudPaper>
+
+@if (Conditions.Any() && Actions.Any())
+{
+    <MudStack Row="true" Class="ma-4">
+        <div>
+            <MudStack Row="true" Spacing="2">
+
+                <MudPaper Height="50px" Width="50px">
+                </MudPaper>
+
+                @foreach(var i in ColumnList)
+                {
+                    <MudPaper Height="50px" Width="50px">
+                        <MudText Align="Align.Center" Typo="Typo.body1">@($"R")</MudText>
+                    </MudPaper>
+                }
+
+            </MudStack>
+
+            <MudStack Spacing="2" Row="true" Class="mt-2">
+                <MudStack Row="false">
+                    @for (int m = 0; m < ConditionRows; m++)
+                    {
+                        <MudPaper Height="50px" Width="50px">
+                            <MudText Align="Align.Center" Typo="Typo.body1">@($"C")</MudText>
+                        </MudPaper>
+                    }
+                </MudStack>
+
+                @foreach (var i in ColumnList)
+                {
+                    <MudStack Row="false">
+                        @foreach (var row in Conditions[i].Select((value, c) => (value, c)))
+                        {
+                            <TrueFalse Value="row.value" Column="i" Row="row.c" IsConditon="true" OnClick="UpdateValue" />
+                        }
+                    </MudStack>
+                }
+            </MudStack>
+            <MudDivider Class="mt-2 mb-2"></MudDivider>
+            <MudStack Spacing="2" Row="true">
+                <MudStack Row="false">
+                    @for (int m = 0; m < ActionRows; m++)
+                    {
+                        <MudPaper Height="50px" Width="50px">
+                            <MudText Align="Align.Center" Typo="Typo.body1">@($"A")</MudText>
+                        </MudPaper>
+                    }
+                </MudStack>
+
+                @foreach (var i in ColumnList)
+                {
+                    <MudStack Row="false">
+                        @foreach (var row in Actions[i].Select((value, a) => (value, a)))
+                        {
+                            <TrueFalse Value="row.value" Column="i" Row="row.a" IsConditon="false" OnClick="UpdateValue" />
+                        }
+                    </MudStack>
+                }
+            </MudStack>
+        </div>
+        <MudStack Row="false" Spacing="2" Class="mt-4">
+            <MudButton Color="Color.Secondary" Variant="Variant.Filled" OnClick="CondenseRules">Condense Rules</MudButton>
+            <MudButton Color="Color.Secondary" Variant="Variant.Filled" OnClick="CondenseActions">Condense Actions</MudButton>
+        </MudStack>
+    </MudStack>
+}
+
+@code {
+    public int ConditionRows { get; set; }
+    public int ActionRows { get; set; }
+    public int Columns { get; set; }
+
+    public Dictionary<int, List<bool?>> Conditions = new Dictionary<int, List<bool?>>();
+    public Dictionary<int, List<bool?>> Actions = new Dictionary<int, List<bool?>>();
+    public List<int> ColumnList = new List<int>();
+
+    private void CreateGrid()
+    {
+        this.Conditions = new Dictionary<int, List<bool?>>();
+        this.Actions = new Dictionary<int, List<bool?>>();
+        this.ColumnList = new List<int>();
+
+        for (int i = 0; i < this.Columns; i++)
+        {
+            List<bool?> conditions = new List<bool?>();
+            for (int c = 0; c < this.ConditionRows; c++)
+            {
+                conditions.Add(null);
+            }
+
+            this.Conditions.Add(i, conditions);
+
+            List<bool?> actions = new List<bool?>();
+            for (int a = 0; a < this.ActionRows; a++)
+            {
+                actions.Add(null);
+            }
+
+            this.Actions.Add(i, actions);
+            this.ColumnList.Add(i);
+        }
+
+        if (this.Actions != null)
+        {
+
+        }
+    }
+
+    private void UpdateValue(TrueFalseValue value)
+    {
+        if (value.IsCondition)
+        {
+            this.Conditions[value.Column][value.Row] = value.Value;
+        }
+        else
+        {
+            this.Actions[value.Column][value.Row] = value.Value;
+        }
+    }
+
+    private void CondenseRules()
+    {
+        List<int> columnsCondensed = new List<int>();
+        HashSet<int[]> condensableColumns = new HashSet<int[]>();
+
+        for (int i = 0; i < Columns; i++)
+        {
+            var matchingActions = new List<int>();
+            List<bool?> actions = this.Actions[i];
+
+            for (int n = 0; n < Columns; n++)
+            {
+                if (i == n)
+                {
+                    continue;
+                }
+
+                var otherActions = this.Actions[n];
+
+                if (actions.SequenceEqual(otherActions))
+                {
+                    matchingActions.Add(n);
+                }
+            }
+
+
+            if (!matchingActions.Any())
+            {
+                continue;
+            }
+
+            matchingActions.Add(i);
+
+            var possibleRules = new Dictionary<int, List<bool?>>();
+
+            foreach (int matchedAction in matchingActions)
+            {
+                possibleRules.Add(matchedAction, this.Conditions[matchedAction]);
+            }
+
+            if (!possibleRules.Any())
+            {
+                continue;
+            }
+
+            bool canCondense = false;
+
+            for (int r = 0; r < ConditionRows; r++)
+            {
+                var set = new HashSet<bool?>();
+
+                foreach (var rule in possibleRules)
+                {
+                    var value = rule.Value[r];
+
+                    set.Add(value);
+                }
+
+                if (set.Count == 1)
+                {
+                    canCondense = true;
+                }
+            }
+
+            if (canCondense && !condensableColumns.Any((x) => Enumerable.SequenceEqual(x.OrderBy((x) => x), matchingActions.OrderBy((x) => x))))
+            {
+                condensableColumns.Add(matchingActions.ToArray());
+            }
+        }
+
+        foreach (var condenseable in condensableColumns)
+        {
+            if (!columnsCondensed.Contains(condenseable[0]))
+            {
+                this.Actions.Remove(condenseable[0]);
+                this.Conditions.Remove(condenseable[0]);
+
+                columnsCondensed.Add(condenseable[0]);
+                this.ColumnList.Remove(condenseable[0]);
+            }
+        }
+    }
+
+    private void CondenseActions()
+    {
+        
+    }
+}
